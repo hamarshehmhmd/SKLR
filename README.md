@@ -28,12 +28,10 @@ SKLR is a pioneering Skill-based Economy App dedicated to connecting talented in
 Here's a sneak peek of SKLR in action:
 
 <div align="center">
-  <img src="ai_ss.png" alt="AI Assitant" width="30%">
-  <img src="mid_ss.png" alt="SKLR Screenshot" width="30%">
-  <img src="tbd.png" alt="SKLR Screenshot 3" width="30%">
+  <img src="mid_ss.png" alt="SKLR Screenshot" width=70%>
 </div>
 
-These screenshots represent the current progress. The final product may differ as I continue to refine and enhance the app based on testing and user feedback.
+These snipts represent the current progress/ Current Working App. The final product may differ as I continue to refine and enhance the app based on testing and user feedback.
 
 ## Features
 
