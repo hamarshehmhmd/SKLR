@@ -6,6 +6,7 @@ import 'package:sklr/Util/navigationbar-bar.dart';
 import 'package:sklr/database/userIdStorage.dart';
 import 'package:sklr/database/database.dart';
 import 'package:sklr/Skills/skillInfo.dart';
+import '../database/models.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});

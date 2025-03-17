@@ -7,6 +7,8 @@ import 'package:sklr/database/userIdStorage.dart';
 import 'package:sklr/Auth/phoneNumber.dart';
 import 'login.dart';
 import '../Util/PrivacyPolicy.dart';
+import '../database/models.dart';
+import 'pendingVerification.dart';
 
 class Register extends StatefulWidget {
   const Register({super.key});
@@ -34,18 +36,60 @@ class RegisterState extends State<Register> {
   }
 
   void registerUser(BuildContext context) async {
-    LoginResponse result = await DatabaseHelper.registerUser(username, email, password);
-
-    if (result.success) {
-      await UserIdStorage.saveLoggedInUserId(result.userId);
-
-      Navigator.of(context).push(
-        MaterialPageRoute(builder: (context) => PhoneNumber()),
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF6296FF)),
+            ),
+          );
+        },
       );
-    }
-    else {
+      
+      // Register the user
+      LoginResponse result = await DatabaseHelper.registerUser(username, email, password);
+      
+      // Close the loading dialog
+      Navigator.pop(context);
+
+      if (result.success) {
+        if (result.message == 'verification_pending') {
+          // Navigate to pending verification page
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PendingVerificationPage(
+                email: email,
+              ),
+            ),
+          );
+        } else {
+          // Regular success case
+          await UserIdStorage.saveLoggedInUserId(result.userId);
+          await UserIdStorage.saveRememberMe(true);
+          
+          // Navigate directly to home page to ensure the app works even if phone verification fails
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (context) => const PhoneNumber()),
+            (route) => false, // Remove all previous routes
+          );
+        }
+      }
+      else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(result.message)),
+        );
+      }
+    } catch (e) {
+      // Close loading dialog if it's still showing
+      Navigator.of(context).popUntil((route) => route.isFirst);
+      
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result.message)),
+        SnackBar(content: Text('Registration error: ${e.toString()}')),
       );
     }
   }

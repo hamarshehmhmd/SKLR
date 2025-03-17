@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:sklr/Chat/chatSessionUtil.dart';
+import 'package:sklr/Profile/user.dart';
 import '../database/database.dart';
+import '../Util/navigationbar-bar.dart';
+import 'chatsHome.dart';
+import '../Home/home.dart';
+import '../Skills/myOrders.dart';
+import '../Profile/profile.dart';
+import '../Support/supportMain.dart';
 
 class ChatPage extends StatefulWidget {
   final int chatId;
@@ -29,9 +36,20 @@ class _ChatPageState extends State<ChatPage> {
   @override
   void initState() {
     super.initState();
-    _loadMessages();
+    messages = _initializeMessages();
+    _markMessagesAsRead();
     // Set up periodic refresh every 10 seconds
     _startPeriodicRefresh();
+  }
+
+  Future<List<Map<String, dynamic>>> _initializeMessages() async {
+    try {
+      final messages = await DatabaseHelper.getChatMessages(widget.chatId);
+      return messages;
+    } catch (e) {
+      debugPrint('Error initializing messages: $e');
+      return [];
+    }
   }
 
   void _startPeriodicRefresh() {
@@ -55,7 +73,13 @@ class _ChatPageState extends State<ChatPage> {
     
     setState(() => isLoading = true);
     try {
-      messages = DatabaseHelper.fetchMessages(widget.chatId);
+      final messagesList = await DatabaseHelper.getChatMessages(widget.chatId);
+      if (mounted) {
+        setState(() {
+          messages = Future.value(messagesList);
+          isLoading = false;
+        });
+      }
       
       // Scroll to bottom after messages load
       await Future.delayed(const Duration(milliseconds: 100));
@@ -68,13 +92,10 @@ class _ChatPageState extends State<ChatPage> {
       }
     } catch (e) {
       if (mounted) {
+        setState(() => isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error loading messages: $e'))
         );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => isLoading = false);
       }
     }
   }
@@ -85,41 +106,78 @@ class _ChatPageState extends State<ChatPage> {
 
     setState(() => isLoading = true);
     try {
-      await DatabaseHelper.sendMessage(
-        widget.chatId,
-        widget.loggedInUserId,
-        messageText,
+      // Get the recipient ID from the session
+      final sessionData = await DatabaseHelper.fetchSessionFromChat(widget.chatId);
+      if (!sessionData.success) {
+        throw Exception('Failed to fetch session data');
+      }
+      
+      final recipientId = sessionData.data['provider_id'] == widget.loggedInUserId
+          ? sessionData.data['requester_id']
+          : sessionData.data['provider_id'];
+      
+      // Get the sender's name
+      final senderData = await DatabaseHelper.getUserById(widget.loggedInUserId);
+      final senderName = senderData?['username'] ?? 'Unknown User';
+      final senderImage = senderData?['profile_image'];
+
+      await DatabaseHelper.sendMessageWithNotification(
+        chatId: widget.chatId,
+        senderId: widget.loggedInUserId,
+        message: messageText,
+        senderName: senderName,
+        recipientId: recipientId,
+        senderImage: senderImage,
       );
       _messageController.clear();
       await _loadMessages();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to send message: $e'))
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to send message: $e'))
+        );
+      }
     } finally {
-      setState(() => isLoading = false);
+      if (mounted) {
+        setState(() => isLoading = false);
+      }
     }
+  }
+
+  Future<void> _markMessagesAsRead() async {
+    await DatabaseHelper.markChatAsRead(widget.chatId);
   }
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => FocusScope.of(context).unfocus(),
-      child: Scaffold(
-        backgroundColor: const Color(0xFFF5F7FA),
-        appBar: _buildAppBar(),
-        body: Column(
-          children: [
-            Expanded(
-              child: RefreshIndicator(
-                onRefresh: _loadMessages,
-                color: const Color(0xFF6296FF),
-                child: _buildMessageList(),
+    return WillPopScope(
+      onWillPop: () async {
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (context) => const ChatsHomePage()),
+          (route) => false,
+        );
+        return false;
+      },
+      child: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: Scaffold(
+          backgroundColor: const Color(0xFFF5F7FA),
+          appBar: _buildAppBar(),
+          body: Column(
+            children: [
+              Expanded(
+                child: RefreshIndicator(
+                  onRefresh: _loadMessages,
+                  color: const Color(0xFF6296FF),
+                  child: _buildMessageList(),
+                ),
               ),
-            ),
-            _buildSessionStatus(),
-            _buildMessageInput(),
-          ],
+              _buildSessionStatus(),
+              _buildMessageInput(),
+            ],
+          ),
+          bottomNavigationBar: const CustomBottomNavigationBar(currentIndex: 1),
         ),
       ),
     );
@@ -133,51 +191,99 @@ class _ChatPageState extends State<ChatPage> {
         backgroundColor: const Color(0xFF6296FF),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () {
+            // Navigate to ChatsHomePage when back button is pressed
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(builder: (context) => const ChatsHomePage()),
+              (route) => false,
+            );
+          },
         ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              widget.otherUsername,
-              style: GoogleFonts.mulish(
-                color: Colors.white,
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            FutureBuilder<Map<String, dynamic>>(
-              future: _loadSessionAndSkill(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return Text(
-                    'Loading...',
-                    style: GoogleFonts.mulish(
-                      color: Colors.white70,
-                      fontSize: 14,
+        title: FutureBuilder<Map<String, dynamic>>(
+          future: _loadSessionAndSkill(),
+          builder: (context, snapshot) {
+            return GestureDetector(
+              onTap: () {
+                // Only navigate if we have session data
+                if (snapshot.hasData && snapshot.data != null) {
+                  final sessionData = snapshot.data!['session'];
+                  int otherUserId;
+                  
+                  // Determine which user ID to use based on who is logged in
+                  if (sessionData['provider_id'] == widget.loggedInUserId) {
+                    // If logged-in user is the provider, navigate to requester's profile
+                    otherUserId = sessionData['requester_id'];
+                  } else {
+                    // If logged-in user is the requester, navigate to provider's profile
+                    otherUserId = sessionData['provider_id'];
+                  }
+                  
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => UserPage(userId: otherUserId),
                     ),
                   );
-                }
-                if (snapshot.hasError) {
-                  return Text(
-                    'Error loading skill info',
-                    style: GoogleFonts.mulish(
-                      color: Colors.red[100],
-                      fontSize: 14,
-                    ),
+                } else {
+                  // Show loading message if session data isn't available yet
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Loading user data...'))
                   );
                 }
-                final skillName = snapshot.data?['skillName'] ?? 'Unknown Skill';
-                return Text(
-                  skillName,
-                  style: GoogleFonts.mulish(
-                    color: Colors.white70,
-                    fontSize: 14,
-                  ),
-                );
               },
-            ),
-          ],
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(
+                          widget.otherUsername,
+                          style: GoogleFonts.mulish(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      const SizedBox(width: 5),
+                      const Icon(
+                        Icons.person_outline,
+                        color: Colors.white70,
+                        size: 16,
+                      ),
+                    ],
+                  ),
+                  if (snapshot.connectionState == ConnectionState.waiting)
+                    Text(
+                      'Loading...',
+                      style: GoogleFonts.mulish(
+                        color: Colors.white70,
+                        fontSize: 14,
+                      ),
+                    )
+                  else if (snapshot.hasError)
+                    Text(
+                      'Error loading skill info',
+                      style: GoogleFonts.mulish(
+                        color: Colors.red[100],
+                        fontSize: 14,
+                      ),
+                    )
+                  else
+                    Text(
+                      snapshot.data?['skillName'] ?? 'Unknown Skill',
+                      style: GoogleFonts.mulish(
+                        color: Colors.white70,
+                        fontSize: 14,
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
         ),
         actions: [
           IconButton(
@@ -221,7 +327,8 @@ class _ChatPageState extends State<ChatPage> {
                 );
               }
 
-              if (!snapshot.hasData || snapshot.data!.isEmpty) {
+              final messagesList = snapshot.data ?? [];
+              if (messagesList.isEmpty) {
                 return Center(
                   child: Text(
                     'No messages yet\nStart the conversation!',
@@ -238,14 +345,14 @@ class _ChatPageState extends State<ChatPage> {
                 controller: _scrollController,
                 reverse: true,
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-                itemCount: snapshot.data!.length,
+                itemCount: messagesList.length,
                 itemBuilder: (context, index) {
-                  final message = snapshot.data![index];
-                  final bool isSentByUser = message['sender_id'] == widget.loggedInUserId;
+                  final message = messagesList[index];
+                  final bool isSentByUser = message['sender_id'].toString() == widget.loggedInUserId.toString();
                   final bool isNextSameSender = index > 0 &&
-                      snapshot.data![index - 1]['sender_id'] == message['sender_id'];
-                  final bool isPrevSameSender = index < snapshot.data!.length - 1 &&
-                      snapshot.data![index + 1]['sender_id'] == message['sender_id'];
+                      messagesList[index - 1]['sender_id'].toString() == message['sender_id'].toString();
+                  final bool isPrevSameSender = index < messagesList.length - 1 &&
+                      messagesList[index + 1]['sender_id'].toString() == message['sender_id'].toString();
 
                   return Padding(
                     padding: EdgeInsets.only(
@@ -368,68 +475,101 @@ class _ChatPageState extends State<ChatPage> {
     switch (status) {
       case 'Idle':
         return Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
           color: Colors.white,
-          child: ElevatedButton.icon(
-            icon: const Icon(Icons.handshake_outlined),
+          child: ElevatedButton(
             onPressed: () => _handleServiceRequest(session),
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFF6296FF),
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              elevation: 2,
+              shadowColor: Colors.black26,
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(8),
               ),
             ),
-            label: Text(
-              'Request Service',
-              style: GoogleFonts.mulish(
-                color: Colors.white,
-                fontWeight: FontWeight.w600,
-              ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.handshake_outlined, size: 20),
+                const SizedBox(width: 10),
+                Text(
+                  'Request Service',
+                  style: GoogleFonts.mulish(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
           ),
         );
 
       case 'Pending':
         return Container(
-          padding: const EdgeInsets.symmetric(vertical: 12),
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
           color: Colors.white,
           child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              ElevatedButton.icon(
-                icon: const Icon(Icons.check_circle_outline),
-                onPressed: () => _handleServiceComplete(session),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.green,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () => _handleServiceComplete(session),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.green[600],
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    elevation: 2,
+                    shadowColor: Colors.black26,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
-                ),
-                label: Text(
-                  'Complete',
-                  style: GoogleFonts.mulish(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.check_circle_outline, size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Complete',
+                        style: GoogleFonts.mulish(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.cancel_outlined),
-                onPressed: () => _handleServiceCancel(session),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () => _handleServiceCancel(session),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red[600],
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    elevation: 2,
+                    shadowColor: Colors.black26,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
-                ),
-                label: Text(
-                  'Cancel',
-                  style: GoogleFonts.mulish(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.cancel_outlined, size: 18),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Cancel',
+                        style: GoogleFonts.mulish(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),

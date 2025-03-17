@@ -9,6 +9,7 @@ import 'package:sklr/database/userIdStorage.dart';
 import 'package:sklr/Home/home.dart';
 import 'package:sklr/Auth/phoneNumber.dart';
 import 'package:pin_code_fields/pin_code_fields.dart';
+import '../database/models.dart';
 
 class PhoneVerify extends StatefulWidget {
   final String code;

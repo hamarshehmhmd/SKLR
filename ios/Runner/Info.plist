@@ -47,5 +47,20 @@
 		<true/>
 		<key>UIStatusBarHidden</key>
 		<false/>
+		<key>CFBundleURLTypes</key>
+		<array>
+			<dict>
+				<key>CFBundleTypeRole</key>
+				<string>Editor</string>
+				<key>CFBundleURLSchemes</key>
+				<array>
+					<string>com.googleusercontent.apps.YOUR_GOOGLE_CLIENT_ID</string>
+				</array>
+			</dict>
+		</array>
+		<key>NSCameraUsageDescription</key>
+		<string>This app requires access to the camera for profile image upload.</string>
+		<key>NSPhotoLibraryUsageDescription</key>
+		<string>This app requires access to the photo library for profile image upload.</string>
 	</dict>
 </plist>

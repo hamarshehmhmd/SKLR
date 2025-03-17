@@ -154,12 +154,13 @@ class _SupportFinderPageState extends State<SupportFinderPage> with SingleTicker
         ]
       });
 
+
       // Make API request to OpenRouter
       final response = await http.post(
         Uri.parse('https://openrouter.ai/api/v1/chat/completions'),
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer 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',
+          'Authorization': 'Bearer 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',
           'HTTP-Referer': 'https://sklr.app',
           'X-Title': 'SKLR Support Assistant',
         },

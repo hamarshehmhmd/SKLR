@@ -462,80 +462,59 @@ class PhoneState extends State<PhoneNumber> {
                         ),
                       ]
                     ),
-                    ElevatedButton( // continue
-                      onPressed: () {
-                        if (selected != null && number != null && number!.isNotEmpty && number!.length >= 9) {
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (context) => PhoneVerify(code: selected!.prefix, number: number ?? '')
-                            )
-                          );
-                        } else { // invalid phone number (fails above checks)
-                          ScaffoldMessenger.of(context)
-                            .showSnackBar(SnackBar(content: Text('Please enter a valid phone number')));
-                        }
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Color(0xff3204FF),
-                        padding: EdgeInsets.all(24),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16)
-                        )
-                      ),
-                      child: Row(
-                        spacing: 8,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            'Continue',
-                            style: GoogleFonts.mulish(
-                              textStyle: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600
+                    Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.symmetric(horizontal: 0.0, vertical: 8.0),
+                      child: ElevatedButton(
+                        onPressed: () {
+                          if (selected != null && number != null && number!.isNotEmpty && number!.length >= 9) {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (context) => PhoneVerify(code: selected!.prefix, number: number ?? '')
                               )
-                            )
+                            );
+                          } else { // invalid phone number (fails above checks)
+                            ScaffoldMessenger.of(context)
+                              .showSnackBar(SnackBar(content: Text('Please enter a valid phone number')));
+                          }
+                        },
+                        style: ButtonStyle(
+                          backgroundColor: WidgetStateProperty.all<Color>(
+                            (selected != null && number != null && number!.isNotEmpty && number!.length >= 9) 
+                                ? const Color(0xFF6296FF) 
+                                : Colors.grey,
                           ),
-                          Icon(
-                            Icons.arrow_right_alt_sharp,
-                            color: Colors.white
+                          foregroundColor: WidgetStateProperty.all<Color>(Colors.white),
+                          shape: WidgetStateProperty.all<RoundedRectangleBorder>(
+                            RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
-                        ]
-                      )
+                        ),
+                        child: const Text(
+                          'Continue',
+                          style: TextStyle(fontSize: 16),
+                        ),
+                      ),
                     ),
-                    ElevatedButton( // skip
+                    
+                    // Skip button to go directly to Home page
+                    TextButton(
                       onPressed: () {
+                        // Allow users to skip phone verification and go directly to home page
                         Navigator.pushReplacement(
-                          context, MaterialPageRoute(builder: (context) => HomePage()), 
+                          context, 
+                          MaterialPageRoute(builder: (context) => HomePage()),
                         );
                       },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Color.fromARGB(255, 4, 96, 255),
-                        padding: EdgeInsets.all(24),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16)
-                        )
+                      child: Text(
+                        'Skip for now',
+                        style: GoogleFonts.mulish(
+                          fontSize: 14,
+                          color: Colors.grey[600],
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                      child: Row(
-                        spacing: 8,
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            'Skip',
-                            style: GoogleFonts.mulish(
-                              textStyle: TextStyle(
-                                color: Colors.white,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w600
-                              )
-                            )
-                          ),
-                          Icon(
-                            Icons.arrow_right_alt_sharp,
-                            color: Colors.white
-                          ),
-                        ]
-                      )
                     ),
                   ]
                 )

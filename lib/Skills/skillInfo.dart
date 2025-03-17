@@ -23,8 +23,8 @@ class Skillinfo extends StatelessWidget {
     }
   }
 
-  Future<Map<String, dynamic>> fetchUser(int id) async {
-    final response = await DatabaseHelper.fetchUserFromId(id);
+  Future<Map<String, dynamic>> fetchUser(dynamic id) async {
+    final response = await DatabaseHelper.fetchUserFromId(id is String ? int.tryParse(id) ?? 0 : id);
     if (response.success) {
       return response.data;
     } else {
@@ -329,7 +329,7 @@ class Skillinfo extends StatelessWidget {
                         // Action buttons
                         Container(
                           margin: const EdgeInsets.all(16),
-                          child: FutureBuilder<int?>(
+                          child: FutureBuilder<dynamic>(
                             future: UserIdStorage.getLoggedInUserId(),
                             builder: (context, snapshot) {
                               if (!snapshot.hasData) {
@@ -338,8 +338,19 @@ class Skillinfo extends StatelessWidget {
                                 );
                               }
 
-                              final loggedInUserId = snapshot.data;
-                              if (loggedInUserId == skill['user_id']) {
+                              final userId = snapshot.data;
+                              
+                              // Helper function to check if the IDs are equivalent
+                              bool isSameUser() {
+                                if (userId == skill['user_id']) return true;
+                                
+                                // Try converting both to strings for comparison
+                                final userIdStr = userId.toString();
+                                final skillUserIdStr = skill['user_id'].toString();
+                                return userIdStr == skillUserIdStr;
+                              }
+                              
+                              if (isSameUser()) {
                                 return Container(
                                   padding: const EdgeInsets.all(24),
                                   decoration: BoxDecoration(
@@ -378,20 +389,27 @@ class Skillinfo extends StatelessWidget {
                                     child: ElevatedButton.icon(
                                       onPressed: () async {
                                         final self = await UserIdStorage.getLoggedInUserId();
+                                        final selfInt = self is String ? int.tryParse(self) ?? -1 : self;
+                                        
                                         final session = await DatabaseHelper.createSession(
-                                          self!,
+                                          selfInt,
                                           skill['id'],
                                         );
+                                        
+                                        final skillUserId = skill['user_id'] is String ? 
+                                            int.tryParse(skill['user_id']) ?? -1 : skill['user_id'];
+                                            
                                         final result = await DatabaseHelper.getOrCreateChat(
-                                          self,
-                                          skill['user_id'],
-                                          session.data['data']['id'],
+                                          selfInt,
+                                          skillUserId,
+                                          session.data['id'],
                                         );
+                                        
                                         Navigator.of(context).push(
                                           MaterialPageRoute(
                                             builder: (context) => ChatPage(
                                               chatId: result,
-                                              loggedInUserId: self,
+                                              loggedInUserId: selfInt,
                                               otherUsername: user['username'],
                                             ),
                                           ),
@@ -404,6 +422,8 @@ class Skillinfo extends StatelessWidget {
                                           fontSize: 16,
                                           fontWeight: FontWeight.w600,
                                         ),
+                                        overflow: TextOverflow.ellipsis,
+                                        maxLines: 1,
                                       ),
                                       style: ElevatedButton.styleFrom(
                                         foregroundColor: Colors.white,

@@ -5,6 +5,7 @@ import 'package:sklr/database/userIdStorage.dart';
 import 'package:sklr/database/database.dart';
 import 'package:sklr/Home/home.dart';
 import 'package:sklr/Auth/register.dart';
+import '../database/models.dart';
 //login page done   
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});

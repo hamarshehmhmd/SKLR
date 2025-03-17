@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 import '../database/database.dart';
 import '../Skills/skillInfo.dart';
 import '../Util/navigationbar-bar.dart';
+import '../database/models.dart';
 
 class CategoryListingsPage extends StatelessWidget {
   final String categoryName;
